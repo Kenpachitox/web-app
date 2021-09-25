@@ -85,4 +85,16 @@ public class CardRepository {
     );
   }
 
+  public Optional<Card> transferMoney(long senderCardId, long recipientCardId, long amount){
+    // language=PostgreSQL
+    return jdbcTemplate.queryOne(
+            """
+              UPDATE cards SET balance = balance - ? WHERE id = ? AND active = TRUE RETURNING id, number, balance;
+              UPDATE cards SET balance = balance + ? WHERE id = ? AND active = TRUE;
+                """
+            ,
+            cardRowMapper,
+            amount, senderCardId, amount, recipientCardId
+    );
+  }
 }

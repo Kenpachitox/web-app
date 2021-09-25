@@ -2,6 +2,9 @@ package org.example.app.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.app.domain.Card;
+import org.example.app.exception.DatabaseException;
+import org.example.app.exception.IncorrectAmountException;
+import org.example.app.exception.NotEnoughFundsException;
 import org.example.app.repository.CardRepository;
 
 import java.util.List;
@@ -29,5 +32,18 @@ public class CardService {
 
   public Optional<Card> order(long id, long ownerId, String number, long balance, boolean active) {
     return cardRepository.order(id,ownerId,number,balance,active);
+  }
+
+  public Optional<Card> transferMoney(long senderCardId, long recipientCardId, long amount){
+    final var balance = cardRepository.getById(senderCardId)
+            .map(Card::getBalance)
+            .orElseThrow(DatabaseException::new);
+    if (amount>balance){
+      throw new NotEnoughFundsException();
+    }
+    if (amount<=0){
+      throw new IncorrectAmountException();
+    }
+    return cardRepository.transferMoney(senderCardId, recipientCardId, amount);
   }
 }
