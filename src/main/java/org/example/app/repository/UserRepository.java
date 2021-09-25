@@ -6,6 +6,8 @@ import org.example.app.domain.UserWithPassword;
 import org.example.jdbc.JdbcTemplate;
 import org.example.jdbc.RowMapper;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -13,12 +15,14 @@ public class UserRepository {
   private final JdbcTemplate jdbcTemplate;
   private final RowMapper<User> rowMapper = resultSet -> new User(
       resultSet.getLong("id"),
-      resultSet.getString("username")
+      resultSet.getString("username"),
+      List.of(resultSet.getString("role"))
   );
   private final RowMapper<UserWithPassword> rowMapperWithPassword = resultSet -> new UserWithPassword(
       resultSet.getLong("id"),
       resultSet.getString("username"),
-      resultSet.getString("password")
+      resultSet.getString("password"),
+      List.of(resultSet.getString("role"))
   );
 
   public Optional<User> getByUsername(String username) {
@@ -39,20 +43,22 @@ public class UserRepository {
    * @param hash
    */
   // TODO: DuplicateKeyException <-
-  public Optional<User> save(long id, String username, String hash) {
+  public Optional<User> save(long id, String username, String hash, Collection<String> role) {
     // language=PostgreSQL
     return id == 0 ? jdbcTemplate.queryOne(
         """
-            INSERT INTO users(username, password) VALUES (?, ?) RETURNING id, username
+            INSERT INTO users(username, password) VALUES (?, ?) RETURNING id, username;
+            INSERT INTO roles(role,"userId") VALUES (?,?) RETURNING  role
             """,
         rowMapper,
-        username, hash
+        username, hash,role,id
     ) : jdbcTemplate.queryOne(
         """
-            UPDATE users SET username = ?, password = ? WHERE id = ? RETURNING id, username
+            UPDATE users SET username = ?, password = ? WHERE id = ? RETURNING id, username;
+            UPDATE roles SET role = ? WHERE "userId" = ? RETURNING role;
             """,
         rowMapper,
-        username, hash, id
+        username, hash, id, role, id
     );
   }
 
@@ -60,8 +66,9 @@ public class UserRepository {
     // language=PostgreSQL
     return jdbcTemplate.queryOne(
         """
-            SELECT u.id, u.username FROM tokens t
+            SELECT u.id, u.username,r.role FROM tokens t
             JOIN users u ON t."userId" = u.id
+            JOIN roles r on u.id = r."userId"
             WHERE t.token = ?
             """,
         rowMapper,
@@ -79,5 +86,17 @@ public class UserRepository {
         """,
         token, userId
     );
+  }
+
+  public void saveRole(long userId, List<String> roles) {
+    // language=PostgreSQL
+    for (String role:roles) {
+      jdbcTemplate.update(
+              """
+            INSERT INTO roles(role, "userId") VALUES (?, ?)
+            """,
+              role, userId
+      );
+    }
   }
 }

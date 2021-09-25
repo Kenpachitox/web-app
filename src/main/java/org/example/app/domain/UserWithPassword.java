@@ -4,10 +4,13 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.example.framework.security.Authentication;
 
+import java.util.Collection;
+
 @AllArgsConstructor
 @Data
 public class UserWithPassword {
   private long id;
   private String username;
   private String password;
+  private Collection<String> role;
 }

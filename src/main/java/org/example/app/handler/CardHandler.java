@@ -5,14 +5,17 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.java.Log;
+import org.example.app.domain.Card;
 import org.example.app.domain.User;
+import org.example.app.exception.DatabaseException;
+import org.example.app.exception.NotEnoughRightsException;
 import org.example.app.service.CardService;
+import org.example.app.util.CardHelper;
 import org.example.app.util.UserHelper;
-import org.example.framework.attribute.RequestAttributes;
+import org.example.framework.security.Roles;
 
 import java.io.IOException;
 import java.util.logging.Level;
-import java.util.regex.Matcher;
 
 @Log
 @RequiredArgsConstructor
@@ -33,13 +36,41 @@ public class CardHandler { // Servlet -> Controller -> Service (domain) -> domai
   }
 
   public void getById(HttpServletRequest req, HttpServletResponse resp) {
-    final var cardId = Long.parseLong(((Matcher) req.getAttribute(RequestAttributes.PATH_MATCHER_ATTR)).group("cardId"));
-    log.log(Level.INFO, "getById");
+    final var cardId = CardHelper.getCardId(req);
+    if (checkAccess(req)){
+      log.log(Level.INFO, "getById");
+    }
   }
 
   public void order(HttpServletRequest req, HttpServletResponse resp) {
+    final var cardId = CardHelper.getCardId(req);
+    if (checkAccess(req)){
+      log.log(Level.INFO, "card ordered");
+    }
   }
 
   public void blockById(HttpServletRequest req, HttpServletResponse resp) {
+    try {
+      final var cardId = CardHelper.getCardId(req);
+      if (checkAccess(req))  {
+        final var data = service.blockById(cardId);
+        resp.setHeader("Content-Type", "application/json");
+        resp.getWriter().write(gson.toJson(data));
+      } else throw new NotEnoughRightsException();
+    }
+    catch (IOException e) {
+        throw new RuntimeException(e);
+    }
+  }
+
+  public boolean checkAccess(HttpServletRequest req){
+    final var cardId = CardHelper.getCardId(req);
+    final var user = UserHelper.getUser(req);
+    final var roles = UserHelper.getRoles(req);
+    final var ownerId = service.getById(cardId)
+            .map(Card::getOwnerId)
+            .orElseThrow(DatabaseException::new);
+    return roles.contains(Roles.ROLE_ADMIN) || user.getId() == ownerId;
+
   }
 }

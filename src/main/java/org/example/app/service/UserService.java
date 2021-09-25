@@ -10,6 +10,7 @@ import org.example.app.exception.PasswordNotMatchesException;
 import org.example.app.exception.RegistrationException;
 import org.example.app.exception.UserNotFoundException;
 import org.example.app.repository.UserRepository;
+import org.example.app.util.UsernameChecker;
 import org.example.framework.security.*;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,7 +37,8 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
   public AnonymousAuthentication provide() {
     return new AnonymousAuthentication(new User(
         -1,
-        "anonymous"
+        "anonymous",
+            List.of(Roles.ROLE_ANONYMOUS)
     ));
   }
 
@@ -47,16 +49,41 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
     //  allowed symbols: [A-Za-z0-9]{2,60}
     //  mis...: Admin, Support, root, ...
     //  мат: ...
-    // FIXME: check for nullability
+    //  check for nullability
     final var username = requestDto.getUsername().trim().toLowerCase();
+    if (requestDto.getUsername() == null) {
+      throw new RegistrationException("username can't be empty");
+    }
+
+    if (!username.matches("^[A-Za-z0-9]{2,60}$")) {
+      throw new RegistrationException("username does not meet requirements");
+    }
+
+    if (!UsernameChecker.checkValidUsername(username)){
+      throw new RegistrationException("obscene language and service names cannot be used as username");
+    }
     // TODO password:
     //  min-length: 8
     //  max-length: 64
     //  non-dictionary
     final var password = requestDto.getPassword().trim();
+
+    if (requestDto.getPassword() == null) {
+      throw new RegistrationException("password can't be null");
+    }
+
+    if (requestDto.getPassword().length() < 8 || requestDto.getPassword().length() > 64) {
+      throw new RegistrationException("password must be bigger than 8 and less than 64");
+    }
+
+    //FIXME: do not throw the password through the classes
+    if (!UsernameChecker.checkValidPassword(password)){
+      throw new RegistrationException("password is too easy");
+    }
+
     final var hash = passwordEncoder.encode(password);
     final var token = keyGenerator.generateKey();
-    final var saved = repository.save(0, username, hash).orElseThrow(RegistrationException::new);
+    final var saved = repository.save(0, username, hash,List.of(Roles.ROLE_USER)).orElseThrow(RegistrationException::new);
 
     repository.saveToken(saved.getId(), token);
     return new RegistrationResponseDto(saved.getId(), saved.getUsername(), token);

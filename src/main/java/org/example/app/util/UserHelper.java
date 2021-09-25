@@ -4,13 +4,24 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.example.app.domain.User;
 import org.example.framework.attribute.RequestAttributes;
 import org.example.framework.security.Authentication;
+import java.util.Collection;
+import java.util.stream.Stream;
 
 public class UserHelper {
   private UserHelper() {
   }
 
-  // TODO: beautify
   public static User getUser(HttpServletRequest req) {
-    return ((User) ((Authentication) req.getAttribute(RequestAttributes.AUTH_ATTR)).getPrincipal());
+    return Stream.of(req.getAttribute(RequestAttributes.AUTH_ATTR))
+            .map(o -> ((Authentication)o).getPrincipal())
+            .map(o -> ((User)o))
+            .findFirst().orElseThrow(RuntimeException::new);
   }
+
+  public static Collection<String> getRoles(HttpServletRequest req) {
+    return Stream.of(req.getAttribute(RequestAttributes.AUTH_ATTR))
+            .map(o -> ((Authentication)o).getAuthorities())
+            .findAny().orElseThrow(RuntimeException::new);
+  }
+
 }

@@ -22,4 +22,5 @@ public class AnonymousAuthentication implements Authentication {
   @Override
   public void eraseCredentials() {
   }
+
 }

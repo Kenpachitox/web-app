@@ -32,3 +32,10 @@ CREATE TABLE cards
     balance   BIGINT  NOT NULL DEFAULT 0,
     active    BOOLEAN NOT NULL DEFAULT TRUE
 );
+CREATE TABLE roles
+(
+    id       BIGSERIAL PRIMARY KEY,
+    role     TEXT   NOT NULL,
+    "userId" BIGINT REFERENCES users,
+    created  timestamptz NOT NULL DEFAULT current_timestamp
+);
