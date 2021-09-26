@@ -1,27 +1,25 @@
 package org.example.app.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.app.domain.AnonUser;
-import org.example.app.domain.User;
-import org.example.app.domain.UserRole;
+import org.example.app.domain.*;
 import org.example.app.dto.*;
 import org.example.app.exception.*;
 import org.example.app.repository.RoleRepository;
+import org.example.app.repository.TokenRepository;
 import org.example.app.repository.UserRepository;
 import org.example.app.util.UsernameChecker;
 import org.example.framework.security.*;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
-import javax.management.relation.Role;
-import java.io.IOException;
 import java.security.SecureRandom;
+import java.time.OffsetDateTime;
 import java.util.*;
 
 @RequiredArgsConstructor
 public class UserService implements AuthenticationProvider, AnonymousProvider {
   private final UserRepository repository;
   private final RoleRepository roleRepository;
+  private final TokenRepository tokenRepository;
   private final PasswordEncoder passwordEncoder;
   private final StringKeyGenerator keyGenerator;
 
@@ -29,7 +27,8 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
   public Authentication authenticate(Authentication authentication) {
     try {
       final var token = (String) authentication.getPrincipal();
-      final var auth = new TokenAuthentication(repository.findByToken(token), null,List.of(),true);
+      final var userId = tokenRepository.getTokenWithTime(token).map(Token::getUserId).orElseThrow(AuthenticationException::new);
+      final var auth = new TokenAuthentication(repository.getByUserId(userId), null,List.of(),true);
 
       if (auth.isAuthenticated()) {
         return auth;
@@ -92,7 +91,7 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
     for (UserRole r:role) {
       roleList.add(r.getRole());
     }
-    repository.saveToken(saved.getId(), token);
+    tokenRepository.saveToken(saved.getId(), token);
     return new RegistrationResponseDto(saved.getId(), saved.getUsername(), token, roleList);
   }
 
@@ -112,9 +111,27 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
       throw new PasswordNotMatchesException();
     }
 
+    final boolean tokenIsDropped = dropToken(saved,15);
+
     final var token = keyGenerator.generateKey();
-    repository.saveToken(saved.getId(), token);
+    tokenRepository.saveToken(saved.getId(), token);
     return new LoginResponseDto(saved.getId(), saved.getUsername(), token, roleList);
+  }
+
+  private boolean dropToken(UserWithPassword userWithPassword, long minuts) {
+    final var tokenToDropWithTime = tokenRepository.getTokenWithTimeByUserId(userWithPassword.getId());
+    final var tokenCreateTime = tokenToDropWithTime
+            .map(Token::getTokenCreateTime)
+            .orElseThrow(LoginException::new);
+    final var tokenToDrop = tokenToDropWithTime
+            .map(Token::getToken)
+            .orElseThrow(RuntimeException::new);
+    final var needToDropToken = (OffsetDateTime.parse(tokenCreateTime).plusMinutes(minuts)).compareTo(OffsetDateTime.now());
+    if (needToDropToken <= 0){
+      tokenRepository.dropToken(tokenToDrop);
+      return true;
+    }
+    return false;
   }
 
 
@@ -134,6 +151,7 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
     if (!secretCode.getSecretCode().equals(requestDto.getSecretCode())) {
       throw new IncorrectSecretCode("Try again later");
     }
+    repository.dropSecretCode(user.getId());
     return register(requestDto);
 
   }

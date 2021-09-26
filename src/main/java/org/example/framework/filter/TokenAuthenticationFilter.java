@@ -3,7 +3,6 @@ package org.example.framework.filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.FilterConfig;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,8 +11,6 @@ import org.example.framework.attribute.RequestAttributes;
 import org.example.framework.security.*;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
-import java.util.regex.Pattern;
 
 public class TokenAuthenticationFilter extends HttpFilter {
   private AuthenticationProvider provider;

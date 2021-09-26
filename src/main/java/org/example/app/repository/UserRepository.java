@@ -64,30 +64,17 @@ public class UserRepository {
     );
   }
 
-  public Optional<User> findByToken(String token) {
+  public Optional<User> getByUserId(long id) {
     // language=PostgreSQL
     return jdbcTemplate.queryOne(
-        """
-            SELECT u.id, u.username FROM tokens t
-            JOIN users u ON t."userId" = u.id
-            WHERE t.token = ?
-            """,
-        rowMapper,
-        token
+            """
+                SELECT id, username FROM users  WHERE id = ?
+                """,
+            rowMapper,
+            id
     );
   }
 
-  public void saveToken(long userId, String token) {
-    // query - SELECT'ов (ResultSet)
-    // update - ? int/long
-    // language=PostgreSQL
-    jdbcTemplate.update(
-        """
-            INSERT INTO tokens(token, "userId") VALUES (?, ?)
-            """,
-        token, userId
-    );
-  }
 
   public void saveSecretCode(String code, long userId){
     // language=PostgreSQL

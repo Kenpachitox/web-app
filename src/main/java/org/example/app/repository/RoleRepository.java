@@ -19,7 +19,7 @@ public class RoleRepository {
           resultSet.getString("role")
   );
 
-  public List<UserRole> getRoleByUserId(Long userId) {
+  public List<UserRole> getRoleByUserId(long userId) {
     // language=PostgreSQL
     return jdbcTemplate.queryAll(
             """

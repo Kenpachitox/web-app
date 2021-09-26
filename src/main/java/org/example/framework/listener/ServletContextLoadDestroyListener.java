@@ -9,6 +9,7 @@ import org.example.app.handler.CardHandler;
 import org.example.app.handler.UserHandler;
 import org.example.app.repository.CardRepository;
 import org.example.app.repository.RoleRepository;
+import org.example.app.repository.TokenRepository;
 import org.example.app.repository.UserRepository;
 import org.example.app.service.CardService;
 import org.example.app.service.UserService;
@@ -42,9 +43,10 @@ public class ServletContextLoadDestroyListener implements ServletContextListener
 
       final var userRepository = new UserRepository(jdbcTemplate);
       final var roleRepository = new RoleRepository(jdbcTemplate);
+      final var tokenRepository = new TokenRepository(jdbcTemplate);
       final var passwordEncoder = new Argon2PasswordEncoder();
       final var keyGenerator = new Base64StringKeyGenerator(64);
-      final var userService = new UserService(userRepository, roleRepository, passwordEncoder, keyGenerator);
+      final var userService = new UserService(userRepository, roleRepository, tokenRepository, passwordEncoder, keyGenerator);
       context.setAttribute(ContextAttributes.AUTH_PROVIDER_ATTR, userService);
       context.setAttribute(ContextAttributes.ANON_PROVIDER_ATTR, userService);
       final var userHandler = new UserHandler(userService, gson);
