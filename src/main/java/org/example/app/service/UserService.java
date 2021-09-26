@@ -1,45 +1,48 @@
 package org.example.app.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.app.domain.AnonUser;
 import org.example.app.domain.User;
-import org.example.app.dto.LoginRequestDto;
-import org.example.app.dto.LoginResponseDto;
-import org.example.app.dto.RegistrationRequestDto;
-import org.example.app.dto.RegistrationResponseDto;
-import org.example.app.exception.PasswordNotMatchesException;
-import org.example.app.exception.RegistrationException;
-import org.example.app.exception.UserNotFoundException;
+import org.example.app.domain.UserRole;
+import org.example.app.dto.*;
+import org.example.app.exception.*;
+import org.example.app.repository.RoleRepository;
 import org.example.app.repository.UserRepository;
 import org.example.app.util.UsernameChecker;
 import org.example.framework.security.*;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.List;
+import javax.management.relation.Role;
+import java.io.IOException;
+import java.security.SecureRandom;
+import java.util.*;
 
 @RequiredArgsConstructor
 public class UserService implements AuthenticationProvider, AnonymousProvider {
   private final UserRepository repository;
+  private final RoleRepository roleRepository;
   private final PasswordEncoder passwordEncoder;
   private final StringKeyGenerator keyGenerator;
 
   @Override
   public Authentication authenticate(Authentication authentication) {
-    final var token = (String) authentication.getPrincipal();
+    try {
+      final var token = (String) authentication.getPrincipal();
+      final var auth = new TokenAuthentication(repository.findByToken(token), null,List.of(),true);
 
-    return repository.findByToken(token)
-        // TODO: add user roles
-        .map(o -> new TokenAuthentication(o, null, List.of(), true))
-        .orElseThrow(AuthenticationException::new);
+      if (auth.isAuthenticated()) {
+        return auth;
+      }else return provide();
+    } catch (RuntimeException e){
+      throw new AuthenticationException(e);
+    }
+
   }
 
   @Override
   public AnonymousAuthentication provide() {
-    return new AnonymousAuthentication(new User(
-        -1,
-        "anonymous",
-            List.of(Roles.ROLE_ANONYMOUS)
-    ));
+    return new AnonymousAuthentication(new AnonUser());
   }
 
   public RegistrationResponseDto register(RegistrationRequestDto requestDto) {
@@ -83,10 +86,14 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
 
     final var hash = passwordEncoder.encode(password);
     final var token = keyGenerator.generateKey();
-    final var saved = repository.save(0, username, hash,List.of(Roles.ROLE_USER)).orElseThrow(RegistrationException::new);
-
+    final var saved = repository.save(0, username, hash).orElseThrow(RegistrationException::new);
+    final var role = roleRepository.save(0,List.of(Roles.ROLE_USER), saved.getId());
+    Set<String> roleList = new HashSet<>();
+    for (UserRole r:role) {
+      roleList.add(r.getRole());
+    }
     repository.saveToken(saved.getId(), token);
-    return new RegistrationResponseDto(saved.getId(), saved.getUsername(), token);
+    return new RegistrationResponseDto(saved.getId(), saved.getUsername(), token, roleList);
   }
 
   public LoginResponseDto login(LoginRequestDto requestDto) {
@@ -95,7 +102,11 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
 
     // FIXME: Security issue
     final var saved = repository.getByUsernameWithPassword(username).orElseThrow(UserNotFoundException::new);
-
+    final var role = roleRepository.getRoleByUserId(saved.getId());
+    Set<String> roleList = new HashSet<>();
+    for (UserRole r:role) {
+      roleList.add(r.getRole());
+    }
     if (!passwordEncoder.matches(password, saved.getPassword())) {
       // FIXME: Security issue
       throw new PasswordNotMatchesException();
@@ -103,6 +114,27 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
 
     final var token = keyGenerator.generateKey();
     repository.saveToken(saved.getId(), token);
-    return new LoginResponseDto(saved.getId(), saved.getUsername(), token);
+    return new LoginResponseDto(saved.getId(), saved.getUsername(), token, roleList);
+  }
+
+
+  public void generateSecretCode(String userName){
+    var code= new int[6];
+    for (int i = 0; i < code.length; i++) {
+      code[i] = new SecureRandom().nextInt(9);
+    }
+    final var user = repository.getByUsername(userName).orElseThrow(UsernameNotFoundException::new);
+    repository.saveSecretCode(Arrays.toString(code), user.getId());
+  }
+
+  public RegistrationResponseDto resetPassword(PasswordResetRequestDto requestDto) {
+    final var user = repository.getByUsername(requestDto.getUsername())
+            .orElseThrow(AuthenticationException::new);
+    final var secretCode = repository.getSecretCode(user.getId()).orElseThrow(IllegalArgumentException::new);
+    if (!secretCode.getSecretCode().equals(requestDto.getSecretCode())) {
+      throw new IncorrectSecretCode("Try again later");
+    }
+    return register(requestDto);
+
   }
 }

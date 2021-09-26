@@ -7,9 +7,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.java.Log;
 import org.example.app.domain.User;
 import org.example.app.dto.LoginRequestDto;
+import org.example.app.dto.PasswordResetRequestDto;
 import org.example.app.dto.RegistrationRequestDto;
+import org.example.app.exception.PasswordResetException;
 import org.example.app.service.CardService;
 import org.example.app.service.UserService;
+import org.example.app.util.UserHelper;
 import org.example.framework.attribute.RequestAttributes;
 
 import java.io.IOException;
@@ -43,6 +46,22 @@ public class UserHandler {
       resp.getWriter().write(gson.toJson(responseDto));
     } catch (IOException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  public void generateSecretCode(HttpServletRequest req, HttpServletResponse resp) {
+    final var user = UserHelper.getUser(req);
+    service.generateSecretCode(user.getUsername());
+  }
+
+  public void passwordReset(HttpServletRequest req, HttpServletResponse resp) {
+    try {
+      final var passwordResetRequestDto = gson.fromJson(req.getReader(), PasswordResetRequestDto.class);
+      final var passwordResetResponseDto = service.resetPassword(passwordResetRequestDto);
+      resp.setHeader("Content-Type", "application/json");
+      resp.getWriter().write(gson.toJson(passwordResetResponseDto));
+    }catch (IOException e){
+      throw new PasswordResetException(e);
     }
   }
 }

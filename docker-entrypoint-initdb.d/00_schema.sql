@@ -39,3 +39,10 @@ CREATE TABLE roles
     "userId" BIGINT REFERENCES users,
     created  timestamptz NOT NULL DEFAULT current_timestamp
 );
+
+CREATE TABLE secret_codes
+(
+    code     TEXT        NOT NULL,
+    "userId" BIGINT      NOT NULL REFERENCES users,
+    created  timestamptz NOT NULL DEFAULT current_timestamp
+);

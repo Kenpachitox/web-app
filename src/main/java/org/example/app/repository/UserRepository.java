@@ -1,6 +1,8 @@
 package org.example.app.repository;
 
 import lombok.RequiredArgsConstructor;
+import org.example.app.domain.SecretCode;
+import org.example.app.domain.UserRole;
 import org.example.app.domain.User;
 import org.example.app.domain.UserWithPassword;
 import org.example.jdbc.JdbcTemplate;
@@ -15,14 +17,16 @@ public class UserRepository {
   private final JdbcTemplate jdbcTemplate;
   private final RowMapper<User> rowMapper = resultSet -> new User(
       resultSet.getLong("id"),
-      resultSet.getString("username"),
-      List.of(resultSet.getString("role"))
+      resultSet.getString("username")
   );
   private final RowMapper<UserWithPassword> rowMapperWithPassword = resultSet -> new UserWithPassword(
       resultSet.getLong("id"),
       resultSet.getString("username"),
-      resultSet.getString("password"),
-      List.of(resultSet.getString("role"))
+      resultSet.getString("password")
+  );
+  private final RowMapper<SecretCode> rowMapperForSecretCode = resultSet -> new SecretCode(
+          resultSet.getString("code"),
+          resultSet.getLong("userId")
   );
 
   public Optional<User> getByUsername(String username) {
@@ -43,22 +47,20 @@ public class UserRepository {
    * @param hash
    */
   // TODO: DuplicateKeyException <-
-  public Optional<User> save(long id, String username, String hash, Collection<String> role) {
+  public Optional<User> save(long id, String username, String hash) {
     // language=PostgreSQL
     return id == 0 ? jdbcTemplate.queryOne(
         """
             INSERT INTO users(username, password) VALUES (?, ?) RETURNING id, username;
-            INSERT INTO roles(role,"userId") VALUES (?,?) RETURNING  role
             """,
         rowMapper,
-        username, hash,role,id
+        username, hash
     ) : jdbcTemplate.queryOne(
         """
             UPDATE users SET username = ?, password = ? WHERE id = ? RETURNING id, username;
-            UPDATE roles SET role = ? WHERE "userId" = ? RETURNING role;
             """,
         rowMapper,
-        username, hash, id, role, id
+        username, hash, id
     );
   }
 
@@ -66,9 +68,8 @@ public class UserRepository {
     // language=PostgreSQL
     return jdbcTemplate.queryOne(
         """
-            SELECT u.id, u.username,r.role FROM tokens t
+            SELECT u.id, u.username FROM tokens t
             JOIN users u ON t."userId" = u.id
-            JOIN roles r on u.id = r."userId"
             WHERE t.token = ?
             """,
         rowMapper,
@@ -82,21 +83,44 @@ public class UserRepository {
     // language=PostgreSQL
     jdbcTemplate.update(
         """
-        INSERT INTO tokens(token, "userId") VALUES (?, ?)
-        """,
+            INSERT INTO tokens(token, "userId") VALUES (?, ?)
+            """,
         token, userId
     );
   }
 
-  public void saveRole(long userId, List<String> roles) {
+  public void saveSecretCode(String code, long userId){
     // language=PostgreSQL
-    for (String role:roles) {
-      jdbcTemplate.update(
-              """
-            INSERT INTO roles(role, "userId") VALUES (?, ?)
+    jdbcTemplate.update(
+        """
+            INSERT INTO secret_codes (code, "userId") VALUES (?, ?)
             """,
-              role, userId
-      );
-    }
+        rowMapperForSecretCode,
+        code,
+        userId
+    );
   }
+
+  public Optional<SecretCode> getSecretCode(long userId){
+    // language=PostgreSQL
+    return jdbcTemplate.queryOne(
+      """
+          SELECT code, "userId"  FROM secret_codes WHERE "userId" = ?
+          """,
+        rowMapperForSecretCode,
+        userId
+    );
+  }
+
+  public Optional<SecretCode> dropSecretCode(long userId){
+    // language=PostgreSQL
+    return jdbcTemplate.queryOne(
+            """
+                DELETE FROM secret_codes WHERE "userId" = ?
+                """,
+            rowMapperForSecretCode,
+            userId
+    );
+  }
+
 }

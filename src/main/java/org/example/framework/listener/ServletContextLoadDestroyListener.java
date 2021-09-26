@@ -8,6 +8,7 @@ import jakarta.servlet.annotation.WebListener;
 import org.example.app.handler.CardHandler;
 import org.example.app.handler.UserHandler;
 import org.example.app.repository.CardRepository;
+import org.example.app.repository.RoleRepository;
 import org.example.app.repository.UserRepository;
 import org.example.app.service.CardService;
 import org.example.app.service.UserService;
@@ -40,9 +41,10 @@ public class ServletContextLoadDestroyListener implements ServletContextListener
       final var gson = new Gson();
 
       final var userRepository = new UserRepository(jdbcTemplate);
+      final var roleRepository = new RoleRepository(jdbcTemplate);
       final var passwordEncoder = new Argon2PasswordEncoder();
       final var keyGenerator = new Base64StringKeyGenerator(64);
-      final var userService = new UserService(userRepository, passwordEncoder, keyGenerator);
+      final var userService = new UserService(userRepository, roleRepository, passwordEncoder, keyGenerator);
       context.setAttribute(ContextAttributes.AUTH_PROVIDER_ATTR, userService);
       context.setAttribute(ContextAttributes.ANON_PROVIDER_ATTR, userService);
       final var userHandler = new UserHandler(userService, gson);
@@ -52,14 +54,16 @@ public class ServletContextLoadDestroyListener implements ServletContextListener
       final var cardHandler = new CardHandler(cardService, gson);
 
       final var routes = Map.<Pattern, Map<String, Handler>>of(
-          Pattern.compile("/cards.getAll"), Map.of(GET, cardHandler::getAll),
-          Pattern.compile("/cards.getById"), Map.of(GET, cardHandler::getById),
-          Pattern.compile("/cards.order"), Map.of(POST, cardHandler::order),
-          Pattern.compile("/cards.blockById"), Map.of(DELETE, cardHandler::blockById),
+          Pattern.compile("^/rest/cards/getAll"), Map.of(GET, cardHandler::getAll),
+          Pattern.compile("^/rest/cards/order"), Map.of(POST, cardHandler::order),
           Pattern.compile("^/rest/cards/(?<cardId>\\d+)$"), Map.of(GET, cardHandler::getById),
+          Pattern.compile("^/rest/cards/blockById(?<cardId>\\d+)$"), Map.of(DELETE, cardHandler::blockById),
+          Pattern.compile("^/rest/cards/transfer$"), Map.of(POST, cardHandler::transferMoney),
           Pattern.compile("^/rest/users/register$"), Map.of(POST, userHandler::register),
           Pattern.compile("^/rest/users/login$"), Map.of(POST, userHandler::login),
-          Pattern.compile("^/rest/cards/transaction$"), Map.of(POST, cardHandler::transferMoney)
+          Pattern.compile("^/rest/users/passwordReset/(?<userName>\\S+)$"), Map.of(GET, userHandler::generateSecretCode),
+          Pattern.compile("^/rest/users/passwordReset$"), Map.of(POST, userHandler::passwordReset)
+
       );
       context.setAttribute(ContextAttributes.ROUTES_ATTR, routes);
 
