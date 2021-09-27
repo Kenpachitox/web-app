@@ -2,7 +2,7 @@
 !/apache-tomcat*/conf
 !/apache-tomcat*/conf/server.xml
 !/apache-tomcat*/conf/certs
-!/apache-tomcat*/conf/certs/server.jks
+!/apache-tomcat*/conf/certs/server.dev.jks
 .idea
 target
 *.zip
