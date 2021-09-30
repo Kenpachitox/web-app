@@ -32,7 +32,9 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
 
       if (auth.isAuthenticated()) {
         return auth;
-      }else return provide();
+      }else {
+        return provide();
+      }
     } catch (RuntimeException e){
       throw new AuthenticationException(e);
     }
