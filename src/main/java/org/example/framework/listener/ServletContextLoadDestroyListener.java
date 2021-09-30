@@ -52,7 +52,7 @@ public class ServletContextLoadDestroyListener implements ServletContextListener
       final var userHandler = new UserHandler(userService, gson);
 
       final var cardRepository = new CardRepository(jdbcTemplate);
-      final var cardService = new CardService(cardRepository);
+      final var cardService = new CardService(cardRepository,roleRepository);
       final var cardHandler = new CardHandler(cardService, gson);
 
       final var routes = Map.<Pattern, Map<String, Handler>>of(

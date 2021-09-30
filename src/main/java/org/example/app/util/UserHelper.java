@@ -18,6 +18,13 @@ public class UserHelper {
             .findFirst().orElseThrow(RuntimeException::new);
   }
 
+  public static User getUserRole(HttpServletRequest req) {
+    return Stream.of(req.getAttribute(RequestAttributes.AUTH_ATTR))
+            .map(o -> ((Authentication)o).getPrincipal())
+            .map(o -> ((User)o))
+            .findFirst().orElseThrow(RuntimeException::new);
+  }
+
   public static Collection<String> getRoles(HttpServletRequest req) {
     return Stream.of(req.getAttribute(RequestAttributes.AUTH_ATTR))
             .map(o -> ((Authentication)o).getAuthorities())

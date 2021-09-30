@@ -7,14 +7,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.java.Log;
 import org.example.app.domain.Card;
 import org.example.app.dto.TransferDto;
-import org.example.app.exception.DatabaseException;
-import org.example.app.exception.NotEnoughRightsException;
+import org.example.app.exception.*;
 import org.example.app.service.CardService;
 import org.example.app.util.CardHelper;
 import org.example.app.util.UserHelper;
 import org.example.framework.security.Roles;
 
 import java.io.IOException;
+import java.util.concurrent.CancellationException;
 import java.util.logging.Level;
 
 @Log
@@ -25,51 +25,42 @@ public class CardHandler { // Servlet -> Controller -> Service (domain) -> domai
 
   public void getAll(HttpServletRequest req, HttpServletResponse resp) {
     try {
-      // cards.getAll?ownerId=1
       final var user = UserHelper.getUser(req);
-      final var data = service.getAllByOwnerId(user.getId());
+      final var data = service.getAllByOwnerId(user.getId(),user);
       resp.setHeader("Content-Type", "application/json");
       resp.getWriter().write(gson.toJson(data));
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw new CardNotFoundException();
     }
   }
 
   public void getById(HttpServletRequest req, HttpServletResponse resp) {
     try {
-    final var cardId = CardHelper.getCardId(req);
-    final var roles = UserHelper.getRoles(req);
-
-    if (roles.contains(Roles.ROLE_ADMIN) || checkOwner(req)){
-      final var data = service.getById(cardId);
+      final var cardId = CardHelper.getCardId(req);
+      final var user = UserHelper.getUser(req);
+      final var data = service.getById(cardId,user);
       resp.setHeader("Content-Type", "application/json");
       resp.getWriter().write(gson.toJson(data));
-    }else throw new NotEnoughRightsException();
     } catch (IOException e) {
-      e.printStackTrace();
+      throw new CardNotFoundException();
     }
   }
 
   public void order(HttpServletRequest req, HttpServletResponse resp) {
-    final var cardId = CardHelper.getCardId(req);
-    final var roles = UserHelper.getRoles(req);
-    if (roles.contains(Roles.ROLE_ADMIN) || checkOwner(req)){
-      log.log(Level.INFO, "card ordered");
-    }else throw new NotEnoughRightsException();
+    final var user = UserHelper.getUser(req);
+    log.log(Level.INFO,"Card ordered");
   }
 
   public void blockById(HttpServletRequest req, HttpServletResponse resp) {
     try {
       final var cardId = CardHelper.getCardId(req);
-      final var roles = UserHelper.getRoles(req);
-      if (roles.contains(Roles.ROLE_ADMIN) || checkOwner(req))  {
-        final var data = service.blockById(cardId);
-        resp.setHeader("Content-Type", "application/json");
-        resp.getWriter().write(gson.toJson(data));
-      } else throw new NotEnoughRightsException();
+      final var user = UserHelper.getUser(req);
+      final var data = service.blockById(cardId, user);
+      resp.setHeader("Content-Type", "application/json");
+      resp.getWriter().write(gson.toJson(data));
     }
     catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new CardBlockException();
     }
   }
 
@@ -78,23 +69,12 @@ public class CardHandler { // Servlet -> Controller -> Service (domain) -> domai
   public void transferMoney(HttpServletRequest req, HttpServletResponse resp){
     try {
       final var TransferDto = gson.fromJson(req.getReader(), TransferDto.class);
-      final var cardId = CardHelper.getCardId(req);
-    if (checkOwner(req)){
-      service.transferMoney(TransferDto.getSenderCardId(), TransferDto.getRecipientCardId(),TransferDto.getAmount());
+      final var user = UserHelper.getUser(req);
+      service.transferMoney(TransferDto.getSenderCardId(),user, TransferDto.getRecipientCardId(),TransferDto.getAmount());
       resp.setHeader("Content-Type", "application/json");
       resp.getWriter().write(gson.toJson(TransferDto));
-    }else throw new NotEnoughRightsException();
     } catch (IOException e) {
-      throw new RuntimeException(e);
+        throw new TransferException();
     }
-  }
-
-  public boolean checkOwner(HttpServletRequest req){
-    final var cardId = CardHelper.getCardId(req);
-    final var user = UserHelper.getUser(req);
-    final var ownerId = service.getById(cardId)
-            .map(Card::getOwnerId)
-            .orElseThrow(DatabaseException::new);
-    return user.getId() == ownerId;
   }
 }
