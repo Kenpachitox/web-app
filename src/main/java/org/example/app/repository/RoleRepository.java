@@ -31,20 +31,34 @@ public class RoleRepository {
   }
 
   // TODO: DuplicateKeyException <-
-  public List<UserRole> save(long id, Collection<String> role, long userId) {
-    // language=PostgreSQL
+  public List<UserRole> save(long id, List<String> role, long userId) {
+    for (int i = 0; i < role.size()-1; i++) {
+      // language=PostgreSQL
+      var a = id == 0 ? jdbcTemplate.update(
+              """
+                      INSERT INTO roles(role, "userId") VALUES (?, ?)
+                      """,
+              role.get(i), userId
+      ) : jdbcTemplate.update(
+              """
+                      UPDATE roles SET role = ? WHERE "userId" = ?
+                      """,
+              role.get(i), userId
+      );
+    }
+      // language=PostgreSQL
     return id == 0 ? jdbcTemplate.queryAll(
-        """
+              """
             INSERT INTO roles(role,"userId") VALUES (?,?) RETURNING role, "userId"
             """,
-            rowMapperForRole,
-        role,userId
-    ) : jdbcTemplate.queryAll(
-        """
-            UPDATE roles SET role = ? WHERE "userId" = ? RETURNING role, "userId"
-            """,
-            rowMapperForRole,
-         role, userId
-    );
+              rowMapperForRole,
+              role.get(role.size()-1),userId
+      ) : jdbcTemplate.queryAll(
+              """
+                  UPDATE roles SET role = ? WHERE "userId" = ? RETURNING role, "userId"
+                  """,
+              rowMapperForRole,
+              role.get(role.size()-1), userId
+      );
   }
 }
