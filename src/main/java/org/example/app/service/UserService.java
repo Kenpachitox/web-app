@@ -12,9 +12,7 @@ import org.example.framework.security.*;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import java.security.SecureRandom;
-import java.sql.Date;
 import java.sql.Timestamp;
-import java.time.OffsetDateTime;
 import java.util.*;
 
 @RequiredArgsConstructor
@@ -140,13 +138,14 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
   }
 
 
-  public void generateSecretCode(String userName){
+  public int[] generateSecretCode(String userName){
     var code= new int[6];
     for (int i = 0; i < code.length; i++) {
       code[i] = new SecureRandom().nextInt(9);
     }
     final var user = repository.getByUsername(userName).orElseThrow(UsernameNotFoundException::new);
     repository.saveSecretCode(Arrays.toString(code), user.getId());
+    return code;
   }
 
   public RegistrationResponseDto resetPassword(PasswordResetRequestDto requestDto) {
@@ -154,7 +153,7 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
             .orElseThrow(AuthenticationException::new);
     final var secretCode = repository.getSecretCode(user.getId()).orElseThrow(IllegalArgumentException::new);
     if (!secretCode.getSecretCode().equals(requestDto.getSecretCode())) {
-      throw new IncorrectSecretCode("Try again later");
+      throw new IncorrectSecretCodeException("Try again later");
     }
     repository.dropSecretCode(user.getId());
     return register(requestDto);

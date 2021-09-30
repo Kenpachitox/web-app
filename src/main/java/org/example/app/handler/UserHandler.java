@@ -9,7 +9,10 @@ import org.example.app.domain.User;
 import org.example.app.dto.LoginRequestDto;
 import org.example.app.dto.PasswordResetRequestDto;
 import org.example.app.dto.RegistrationRequestDto;
+import org.example.app.exception.LoginException;
+import org.example.app.exception.NotCreateSecretCodeException;
 import org.example.app.exception.PasswordResetException;
+import org.example.app.exception.RegistrationException;
 import org.example.app.service.CardService;
 import org.example.app.service.UserService;
 import org.example.app.util.UserHelper;
@@ -33,7 +36,7 @@ public class UserHandler {
       resp.setHeader("Content-Type", "application/json");
       resp.getWriter().write(gson.toJson(responseDto));
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw new RegistrationException();
     }
   }
 
@@ -45,23 +48,32 @@ public class UserHandler {
       resp.setHeader("Content-Type", "application/json");
       resp.getWriter().write(gson.toJson(responseDto));
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw new LoginException();
     }
   }
 
   public void generateSecretCode(HttpServletRequest req, HttpServletResponse resp) {
-    final var user = UserHelper.getUser(req);
-    service.generateSecretCode(user.getUsername());
+    try {
+      log.log(Level.INFO, "generateSecretCode");
+      final var user = UserHelper.getUser(req);
+      final var secretCode = service.generateSecretCode(user.getUsername());
+      resp.setHeader("Content-Type", "application/json");
+      resp.getWriter().write(gson.toJson(secretCode));
+    } catch (IOException e){
+      throw new NotCreateSecretCodeException();
+    }
+
   }
 
   public void passwordReset(HttpServletRequest req, HttpServletResponse resp) {
     try {
+      log.log(Level.INFO, "passwordReset");
       final var passwordResetRequestDto = gson.fromJson(req.getReader(), PasswordResetRequestDto.class);
       final var passwordResetResponseDto = service.resetPassword(passwordResetRequestDto);
       resp.setHeader("Content-Type", "application/json");
       resp.getWriter().write(gson.toJson(passwordResetResponseDto));
     }catch (IOException e){
-      throw new PasswordResetException(e);
+      throw new PasswordResetException();
     }
   }
 }
