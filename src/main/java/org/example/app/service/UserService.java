@@ -12,11 +12,14 @@ import org.example.framework.security.*;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import java.security.SecureRandom;
+import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.util.*;
 
 @RequiredArgsConstructor
 public class UserService implements AuthenticationProvider, AnonymousProvider {
+  private static final long TOKEN_LIFETIME = 15;
   private final UserRepository repository;
   private final RoleRepository roleRepository;
   private final TokenRepository tokenRepository;
@@ -28,8 +31,8 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
     try {
       final var token = (String) authentication.getPrincipal();
       final var userId = tokenRepository.getTokenWithTime(token).map(Token::getUserId).orElseThrow(AuthenticationException::new);
-      final var auth = new TokenAuthentication(repository.getByUserId(userId), null,List.of(),true);
-
+      tokenRepository.updateTokenUsedTime(token);
+      final var auth = new TokenAuthentication(repository.getByUserId(userId), null, List.of(),true);
       if (auth.isAuthenticated()) {
         return auth;
       }else {
@@ -113,23 +116,23 @@ public class UserService implements AuthenticationProvider, AnonymousProvider {
       throw new PasswordNotMatchesException();
     }
 
-    final boolean tokenIsDropped = dropToken(saved,15);
+    final boolean tokenIsDropped = dropToken(saved);
 
     final var token = keyGenerator.generateKey();
     tokenRepository.saveToken(saved.getId(), token);
     return new LoginResponseDto(saved.getId(), saved.getUsername(), token, roleList);
   }
 
-  private boolean dropToken(UserWithPassword userWithPassword, long minuts) {
+  private boolean dropToken(UserWithPassword userWithPassword) {
     final var tokenToDropWithTime = tokenRepository.getTokenWithTimeByUserId(userWithPassword.getId());
-    final var tokenCreateTime = tokenToDropWithTime
-            .map(Token::getTokenCreateTime)
+    final var tokenUsedTime = tokenToDropWithTime
+            .map(Token::getTokenUsedTime)
             .orElseThrow(LoginException::new);
     final var tokenToDrop = tokenToDropWithTime
             .map(Token::getToken)
             .orElseThrow(RuntimeException::new);
-    final var needToDropToken = (OffsetDateTime.parse(tokenCreateTime).plusMinutes(minuts)).compareTo(OffsetDateTime.now());
-    if (needToDropToken <= 0){
+    final var needToDropToken = tokenUsedTime.getTime() + TOKEN_LIFETIME - new Timestamp(System.currentTimeMillis()).getTime()>=0;
+    if (needToDropToken){
       tokenRepository.dropToken(tokenToDrop);
       return true;
     }

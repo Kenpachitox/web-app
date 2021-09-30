@@ -16,18 +16,20 @@ public class TokenRepository {
   private final JdbcTemplate jdbcTemplate;
   private final RowMapper<Token> rowMapper = resultSet -> new Token(
           resultSet.getString("token"),
-          resultSet.getString("created"),
+          resultSet.getTimestamp("created"),
+          resultSet.getTimestamp("used"),
           resultSet.getLong("userId")
+
   );
 
   public Optional<Token> getTokenWithTime(String token) {
     // language=PostgreSQL
     return jdbcTemplate.queryOne(
             """
-              SELECT token, "userId", created FROM tokens WHERE token = ?;
+              SELECT token, "userId", created, used FROM tokens WHERE token = ?;
               """,
             rowMapper,
-            token,token
+            token
     );
   }
 
@@ -60,6 +62,16 @@ public class TokenRepository {
     jdbcTemplate.update(
             """
                 DELETE FROM tokens WHERE token = ?
+                """,
+            token
+    );
+  }
+
+  public void updateTokenUsedTime(String token) {
+    // language=PostgreSQL
+    jdbcTemplate.update(
+            """
+                UPDATE tokens SET used = current_timestamp WHERE token = ?
                 """,
             token
     );

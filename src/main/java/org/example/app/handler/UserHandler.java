@@ -39,7 +39,7 @@ public class UserHandler {
 
   public void login(HttpServletRequest req, HttpServletResponse resp) {
     try {
-      log.log(Level.INFO, "register");
+      log.log(Level.INFO, "login");
       final var requestDto = gson.fromJson(req.getReader(), LoginRequestDto.class);
       final var responseDto = service.login(requestDto);
       resp.setHeader("Content-Type", "application/json");
