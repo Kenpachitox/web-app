@@ -78,7 +78,6 @@ public class CardRepository {
     ) : jdbcTemplate.queryOne(
             """
                 UPDATE cards SET "ownerId" = ?, number = ?, balance = ?, active = ? WHERE id = ? RETURNING id, "ownerId", number, balance, active;
-                UPDATE roles SET role = ? WHERE "userId" = ? RETURNING role;
                 """,
             cardFullRowMapper,
             ownerId, number, balance, active, id
@@ -87,14 +86,23 @@ public class CardRepository {
 
   public Optional<Card> transferMoney(long senderCardId, long recipientCardId, long amount){
     // language=PostgreSQL
-    return jdbcTemplate.queryOne(
+     var senderCard = jdbcTemplate.queryOne(
             """
               UPDATE cards SET balance = balance - ? WHERE id = ? AND active = TRUE RETURNING id, number, balance;
+                """
+            ,
+            cardRowMapper,
+            amount, senderCardId
+    );
+    // language=PostgreSQL
+    jdbcTemplate.queryOne(
+            """
               UPDATE cards SET balance = balance + ? WHERE id = ? AND active = TRUE;
                 """
             ,
             cardRowMapper,
-            amount, senderCardId, amount, recipientCardId
+             amount, recipientCardId
     );
+    return senderCard;
   }
 }
